@@ -25,22 +25,39 @@ function MainNavigator() {
   const dispatch = useDispatch();
 
   useEffect(() => {
-    dbUtils
-      .init()
-      .then(dbUtils.getWords)
-      .then((result) => {
-        dispatch(wordsLearningActions.setInitial(result));
-      })
-      .then(dbUtils.getTheme)
-      .then((result) => dispatch(themeActions.setInitial(result)))
-      .then(() => setIsIninialized(true));
+    let isMounted = true;
+
+    const initializeApp = async () => {
+      try {
+        await dbUtils.init();
+        const words = await dbUtils.getWords().catch(() => []);
+        dispatch(wordsLearningActions.setInitial(words));
+
+        const themeValue = await dbUtils.getTheme().catch(() => true);
+        dispatch(themeActions.setInitial(themeValue));
+      } catch (error) {
+        console.warn("SQLite initialization failed, using default app state:", error);
+        dispatch(wordsLearningActions.setInitial([]));
+        dispatch(themeActions.setInitial(true));
+      } finally {
+        if (isMounted) {
+          setIsIninialized(true);
+        }
+      }
+    };
+
+    initializeApp();
 
     const interval = setInterval(
       () => dispatch(wordsLearningActions.updateStatuses()),
       REFRESH_STATUSES_SPAN
     );
-    return () => clearInterval(interval);
-  }, []);
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [dispatch]);
 
   return (
     <>

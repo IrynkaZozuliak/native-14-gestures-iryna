@@ -1,8 +1,26 @@
 import * as SQLite from "expo-sqlite";
 
-export const database = SQLite.openDatabase("places.db");
+const canUseWebSql =
+  typeof window !== "undefined" && typeof window.openDatabase === "function";
+
+export const database = canUseWebSql ? SQLite.openDatabase("places.db") : null;
+
+const webStorage = {
+  words: [],
+  theme: true,
+};
+
+function cloneWords() {
+  return webStorage.words.map((word) => ({ ...word }));
+}
 
 export function init() {
+  if (!database) {
+    webStorage.words = [];
+    webStorage.theme = true;
+    return Promise.resolve();
+  }
+
   const promise = new Promise((resolve, reject) => {
     database.transaction((tx) => {
       tx.executeSql(
@@ -44,6 +62,11 @@ export function init() {
 }
 
 export function addWord(word) {
+  if (!database) {
+    webStorage.words = [...webStorage.words, { ...word }];
+    return Promise.resolve({ rows: { _array: cloneWords() } });
+  }
+
   const promise = new Promise((resolve, reject) => {
     database.transaction((tx) => {
       tx.executeSql(
@@ -80,6 +103,13 @@ export function addWord(word) {
   return promise;
 }
 export function updateWord(word) {
+  if (!database) {
+    webStorage.words = webStorage.words.map((item) =>
+      item.word === word.word ? { ...item, ...word } : item
+    );
+    return Promise.resolve({ rows: { _array: cloneWords() } });
+  }
+
   const promise = new Promise((resolve, reject) => {
     database.transaction((tx) => {
       tx.executeSql(
@@ -119,6 +149,11 @@ export function updateWord(word) {
 }
 
 export function deleteWord(wordText) {
+  if (!database) {
+    webStorage.words = webStorage.words.filter((item) => item.word !== wordText);
+    return Promise.resolve();
+  }
+
   const promise = new Promise((resolve, reject) => {
     database.transaction((tx) => {
       tx.executeSql(
@@ -138,6 +173,10 @@ export function deleteWord(wordText) {
 }
 
 export function getWords() {
+  if (!database) {
+    return Promise.resolve(cloneWords());
+  }
+
   const promise = new Promise((resolve, reject) => {
     database.transaction((tx) => {
       tx.executeSql(
@@ -156,6 +195,10 @@ export function getWords() {
   return promise;
 }
 export function getTheme() {
+  if (!database) {
+    return Promise.resolve(webStorage.theme);
+  }
+
   const promise = new Promise((resolve, reject) => {
     database.transaction((tx) => {
       tx.executeSql(
@@ -177,6 +220,11 @@ export function getTheme() {
 }
 
 export function setTheme(isDark) {
+  if (!database) {
+    webStorage.theme = !!isDark;
+    return Promise.resolve();
+  }
+
   const promise = new Promise((resolve, reject) => {
     database.transaction((tx) => {
       tx.executeSql("DELETE FROM theme", [], null, (_, error) => {
